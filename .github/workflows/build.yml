@@ -1,0 +1,46 @@
+name: Build Kernel
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build Kernel by GitHub Actions
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Set up Environment
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y bc bison build-essential ccache curl flex g++-multilib gcc-multilib git gnupg gperf lib32readline-dev lib32z1-dev liblz4-tool libncurses5-dev libsdl1.1-dev libssl-dev libxml2 libxml2-utils lzop pngcrush rsync schedtool squashfs-tools xsltproc zip zlib1g-dev libtinfo5
+
+    - name: Download Clang Compiler
+      run: |
+        mkdir clang
+        cd clang
+        curl -LO "https://googlesource.com"
+        tar -xf clang-r487747c.tar.gz
+
+    - name: Build Kernel
+      run: |
+        export PATH="$(pwd)/clang/bin:$PATH"
+        export ARCH=arm64
+        export SUBARCH=arm64
+        make O=out vendor/fog-perf_defconfig
+        make -j$(nproc --all) O=out CC=clang CLANG_TRIPLE=aarch64-linux-gnu- CROSS_COMPILE=aarch64-linux-gnu-
+
+    - name: Pack Kernel (AnyKernel3)
+      run: |
+        git clone https://github.com
+        cp out/arch/arm64/boot/Image.gz AnyKernel3/
+        cd AnyKernel3
+        zip -r9 ../AnyKernel-fog-custom.zip *
+
+    - name: Upload Kernel Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: Custom-Kernel-Fog
+        path: AnyKernel-fog-custom.zip
+        
